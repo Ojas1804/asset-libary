@@ -8,6 +8,7 @@ import boto3
 import pandas as pd
 import os
 import tempfile
+import customtkinter as ctk
 
 
 class AWSApp:
@@ -18,37 +19,34 @@ class AWSApp:
 
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
-        # screen_height = int(screen_height)
 
         # Set the app size to the screen size of the laptop
         self.master.geometry(f"{screen_width}x{screen_height}")
+        button_font = ctk.CTkFont(family='Courier', size=24, weight='bold')
 
         # AWS Information Entry
-        tk.Label(self.master, text="Select CSV File:", font=helv36, bg="#000", fg="#fff").pack(pady=5)
-        tk.Button(self.master, text="Browse Access Key", 
-                  command=self.load_aws_info,font=helv36, bg="#bb86fc").pack()
+        tk.Label(self.master, text="Select CSV File:", font=helv36, bg="#000", 
+                 fg="#fff").pack(pady=10)
+        ctk.CTkButton(self.master, text="Browse Access Key", command=self.load_aws_info,
+                      font=button_font, corner_radius=10, fg_color='#bb86fc', text_color='#000',
+                      hover_color='#a435f0').pack()
 
         # Image Upload
-        tk.Button(self.master, text="Upload Image", 
-                  command=self.upload_image,font=helv36, bg="#bb86fc").pack(pady=(100, 10))
+        ctk.CTkButton(self.master, text="Upload Image", command=self.upload_image,
+                      font=button_font, corner_radius=10, fg_color='#bb86fc', text_color='#000',
+                      hover_color='#a435f0').pack(pady=(100, 10))
+        # button_font.configure(family='Courier', size=18, weight='bold')
         
         # Image Preview
         self.image_preview = tk.Label(self.master, text="Image Preview", bg='#121212', fg='white')
         self.image_preview.pack()
 
-
         # Result Display
-        self.helv12 = tkFont.Font(family='Courier', size=14)
+        self.helv12 = tkFont.Font(family='Courier', size=12)
         self.result_frame = tk.Frame(self.master, bg='#121212')
         self.result_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)  # Center the frame
         self.result_frame.pack()
 
-        # # Add a vertical scrollbar to the result_frame
-        # self.scrollbar = tk.Scrollbar(self.result_frame, orient=tk.VERTICAL)
-        # self.result_text = scrolledtext.ScrolledText(self.result_frame, wrap=tk.WORD, yscrollcommand=self.scrollbar.set, bg='#121212', fg='white', insertbackground='white', selectbackground='#444', selectforeground='white', font=('Arial', 10))
-        # self.result_text.pack(expand=True, fill="both")
-        # self.scrollbar.config(command=self.result_text.yview)
-        # self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         # Result Display
         self.result_text = scrolledtext.ScrolledText(self.master, wrap=tk.WORD, bg='#121212', fg='white', insertbackground='white', selectbackground='#444', selectforeground='white', font=self.helv12)
         self.result_text.pack()
@@ -78,7 +76,7 @@ class AWSApp:
         creds = pd.read_csv(file_path)
         aws_info['AccessKey'] = creds.iloc[0, 0]
         aws_info['SecretKey'] = creds.iloc[0, 1]
-        aws_info['Region']='ap-south-1'
+        aws_info['Region']=region
         print(aws_info)
 
         return aws_info
@@ -145,7 +143,7 @@ class AWSApp:
     def search_similar_images(self, target_labels):
         # Query DynamoDB for similar images based on labels
         response = self.dynamodb_client.scan(
-            TableName=table_name  # Replace with your actual DynamoDB table name
+            TableName=your-table-name  # Replace with your actual DynamoDB table name
         )
 
         similar_images = []
@@ -176,24 +174,12 @@ class AWSApp:
     
 
     def create_button(self, image_id):
-        download_button = tk.Button(self.result_text, text=f"Download Image {image_id}", command=lambda i=image_id: self.download_image(i), font=('Arial', 10), bg='#1c1b22', fg='white')
-
-        # Bind events for hover and click
-        download_button.bind("<Enter>", lambda event: self.on_enter(event, download_button))
-        download_button.bind("<Leave>", lambda event: self.on_leave(event, download_button))
-        download_button.bind("<Button-1>", lambda event: self.on_click(event, download_button))
+        download_button = ctk.CTkButton(self.result_text, text=f"Download Image {image_id}", 
+                                    command=lambda i=image_id: self.download_image(i), 
+                                    font=('Helvetica', 12), fg_color='#ac7ed7', 
+                                    text_color='black', hover_color='#a435f0')
 
         return download_button
-    
-
-    def on_enter(self, event, button):
-        button.config(bg='#35343a')  # Change background color on hover
-
-    def on_leave(self, event, button):
-        button.config(bg='#1c1b22')  # Change background color back to normal
-
-    def on_click(self, event, button):
-        button.config(bg='#2b2a33')  # Change background color on click
     
 
         # self.result_text.config(state=tk.DISABLED)  # Disable text widget for editing
@@ -233,7 +219,7 @@ class AWSApp:
 
         try:
             # Replace 'your-bucket-name' with your actual S3 bucket name
-            bucket_name = change_bucket_name
+            bucket_name = your-bucket-name
             folder_path = 'images'  # Update this to the folder path where your images are stored
             object_key = f"{folder_path}/{image_id}.jpg" # Assuming images are stored with '.jpg' extension
 
@@ -253,7 +239,7 @@ class AWSApp:
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = ctk.CTk()
     root.geometry("500x500")
     root.config(bg='#121212')
     # root.iconbitmap("logo.ico")
