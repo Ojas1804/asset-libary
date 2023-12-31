@@ -23,3 +23,7 @@ AWS Bucket:
 3. Run the `asset_library.py` file
 4. Select 'Choose CSV File' and upload the CSV file containing AWS access key
 5. Select 'Choose Image' and upload the image you want to search for
+
+## Changes (v1.0.1):
+- Added download button for downloading the image directly from the app.
+- Improved UI
