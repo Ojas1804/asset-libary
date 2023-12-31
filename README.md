@@ -29,3 +29,7 @@ AWS Bucket:
 ## Changes (v2.0.0):
 - Added download image facility
 - Improved UI with CTkinter
+
+## Future work:
+- Try better Image comparison algorithm
+- Better UI
