@@ -6,28 +6,26 @@ from tkinter import scrolledtext
 from PIL import Image, ImageTk
 import boto3
 import pandas as pd
-import time
 import os
 import tempfile
-import threading
 
 
 class AWSApp:
     def __init__(self, master):
         self.master = master
         self.master.title("AWS Image Similarity Search")
-        helv36 = tkFont.Font(family='Helvetica', size=18, weight='bold')
+        helv36 = tkFont.Font(family='Courier', size=18, weight='bold')
 
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
-        screen_height = int(screen_height*1.5)
+        # screen_height = int(screen_height)
 
         # Set the app size to the screen size of the laptop
         self.master.geometry(f"{screen_width}x{screen_height}")
 
         # AWS Information Entry
         tk.Label(self.master, text="Select CSV File:", font=helv36, bg="#000", fg="#fff").pack(pady=5)
-        tk.Button(self.master, text="Browse Credentials", 
+        tk.Button(self.master, text="Browse Access Key", 
                   command=self.load_aws_info,font=helv36, bg="#bb86fc").pack()
 
         # Image Upload
@@ -40,15 +38,32 @@ class AWSApp:
 
 
         # Result Display
-        self.helv12 = tkFont.Font(family='Helvetica', size=14, weight='bold')
+        self.helv12 = tkFont.Font(family='Courier', size=14)
         self.result_frame = tk.Frame(self.master, bg='#121212')
         self.result_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)  # Center the frame
         self.result_frame.pack()
+
+        # # Add a vertical scrollbar to the result_frame
+        # self.scrollbar = tk.Scrollbar(self.result_frame, orient=tk.VERTICAL)
+        # self.result_text = scrolledtext.ScrolledText(self.result_frame, wrap=tk.WORD, yscrollcommand=self.scrollbar.set, bg='#121212', fg='white', insertbackground='white', selectbackground='#444', selectforeground='white', font=('Arial', 10))
+        # self.result_text.pack(expand=True, fill="both")
+        # self.scrollbar.config(command=self.result_text.yview)
+        # self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Result Display
+        self.result_text = scrolledtext.ScrolledText(self.master, wrap=tk.WORD, bg='#121212', fg='white', insertbackground='white', selectbackground='#444', selectforeground='white', font=self.helv12)
+        self.result_text.pack()
 
         # Initialize AWS clients
         self.s3_client = None
         self.rekognition_client = None
         self.dynamodb_client = None
+
+        # Configure ttk.Style to use curved edges for buttons
+        style = ttk.Style()
+
+        # Apply styling to buttons
+        style.configure('TButton', borderwidth=0, focuscolor='#121212', lightcolor='#121212', darkcolor='#121212', relief='flat', background='#444', foreground='white', padding=10, font=('Arial', 10))
+        style.map('TButton', background=[('active', '#555')])
 
 
     def load_aws_info(self):
@@ -130,7 +145,7 @@ class AWSApp:
     def search_similar_images(self, target_labels):
         # Query DynamoDB for similar images based on labels
         response = self.dynamodb_client.scan(
-            TableName="image_table"  # Replace with your actual DynamoDB table name
+            TableName=table_name  # Replace with your actual DynamoDB table name
         )
 
         similar_images = []
@@ -160,49 +175,65 @@ class AWSApp:
         return similar_images[:10]
     
 
+    def create_button(self, image_id):
+        download_button = tk.Button(self.result_text, text=f"Download Image {image_id}", command=lambda i=image_id: self.download_image(i), font=('Arial', 10), bg='#1c1b22', fg='white')
+
+        # Bind events for hover and click
+        download_button.bind("<Enter>", lambda event: self.on_enter(event, download_button))
+        download_button.bind("<Leave>", lambda event: self.on_leave(event, download_button))
+        download_button.bind("<Button-1>", lambda event: self.on_click(event, download_button))
+
+        return download_button
+    
+
+    def on_enter(self, event, button):
+        button.config(bg='#35343a')  # Change background color on hover
+
+    def on_leave(self, event, button):
+        button.config(bg='#1c1b22')  # Change background color back to normal
+
+    def on_click(self, event, button):
+        button.config(bg='#2b2a33')  # Change background color on click
+    
+
         # self.result_text.config(state=tk.DISABLED)  # Disable text widget for editing
     def display_results(self, similar_images):
         for widget in self.result_frame.winfo_children():
             widget.destroy()
-
         if similar_images:
-            # Display headers
-            header_labels = ["POID", "SIMILARITY", "IMAGE DETAILS"]
-            for col, header in enumerate(header_labels):
-                tk.Label(self.result_frame, text=header, font=self.helv12).grid(row=0, column=col, sticky="nsew", padx=10, pady=4)
-
             # Display data
-            for row, image in enumerate(similar_images, start=1):
+            for image in similar_images:
                 image_id = image['image_id']
                 f1_score = image['f1_score']
                 stored_labels = ', '.join(image['stored_labels'])
-                # Create a button for each image
-                btn = tk.Button(self.result_frame, text=image_id, command=lambda i=image_id: self.download_image(i), bg='#333', fg='white', padx=10, pady=2)
-                btn.grid(row=row, column=0, sticky="nsew", padx=10, pady=2)
 
-                tk.Label(self.result_frame, text=f"{f1_score:.4f}", bg='#121212', fg='white').grid(row=row, column=1, sticky="nsew", padx=10, pady=2)
-                tk.Label(self.result_frame, text=stored_labels, bg='#121212', fg='white').grid(row=row, column=2, sticky="nsew", padx=10, pady=2)
+                # Display information in the scrolled text widget
+                result_text = f"POID: {image_id}\nSimilarity: {f1_score:.4f}\nImage Details: {stored_labels}\n"
+                self.result_text.insert(tk.END, result_text)
 
-                # Add space between rows
-                self.result_frame.grid_rowconfigure(row, minsize=20)
+                # Add a button for each row (image ID)
+                download_button = self.create_button(image_id)
+                self.result_text.window_create(tk.END, window=download_button)
+                self.result_text.insert(tk.END, '\n\n\n')
 
         else:
-            # tk.Label(self.result_frame, text="No similar images found.", font=("Arial", 10, "italic")).grid(row=0, column=0, columnspan=3, sticky="nsew")
-            tk.Label(self.result_frame, text="No similar images found.", font=("Arial", 10, "italic"), bg='#121212', fg='white').grid(row=0, column=0, columnspan=3, sticky="nsew")
+            self.result_text.insert(tk.END, "No similar images found.")
 
         # Configure grid weights to make it expandable
         for i in range(self.result_frame.grid_size()[1]):
             self.result_frame.grid_columnconfigure(i, weight=1)
+        self.result_text.config(state=tk.DISABLED)
 
 
     def download_image(self, image_id):
         if self.s3_client is None:
-            tk.messagebox.showerror("Error", "AWS S3 client not initialized.")
+            # tk.messagebox.showerror("Error", "AWS S3 client not initialized.")
+            tk.messagebox.showinfo("Download Image", f"Downloading image with ID: {image_id}")
             return
 
         try:
             # Replace 'your-bucket-name' with your actual S3 bucket name
-            bucket_name = 'dns-assets'
+            bucket_name = change_bucket_name
             folder_path = 'images'  # Update this to the folder path where your images are stored
             object_key = f"{folder_path}/{image_id}.jpg" # Assuming images are stored with '.jpg' extension
 

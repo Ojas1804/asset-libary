@@ -24,6 +24,6 @@ AWS Bucket:
 4. Select 'Choose CSV File' and upload the CSV file containing AWS access key
 5. Select 'Choose Image' and upload the image you want to search for
 
-## Changes (v1.0.1):
-- Added download button for downloading the image directly from the app.
-- Improved UI
+## Changes (v2.0.0):
+- Added image preview option for the user
+- Removed download option for images
