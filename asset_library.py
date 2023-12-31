@@ -7,6 +7,8 @@ from PIL import Image, ImageTk
 import boto3
 import pandas as pd
 import time
+import os
+import tempfile
 import threading
 
 
@@ -16,6 +18,13 @@ class AWSApp:
         self.master.title("AWS Image Similarity Search")
         helv36 = tkFont.Font(family='Helvetica', size=18, weight='bold')
 
+        screen_width = self.master.winfo_screenwidth()
+        screen_height = self.master.winfo_screenheight()
+        screen_height = int(screen_height*1.5)
+
+        # Set the app size to the screen size of the laptop
+        self.master.geometry(f"{screen_width}x{screen_height}")
+
         # AWS Information Entry
         tk.Label(self.master, text="Select CSV File:", font=helv36, bg="#000", fg="#fff").pack(pady=5)
         tk.Button(self.master, text="Browse Credentials", 
@@ -24,20 +33,17 @@ class AWSApp:
         # Image Upload
         tk.Button(self.master, text="Upload Image", 
                   command=self.upload_image,font=helv36, bg="#bb86fc").pack(pady=(100, 10))
+        
+        # Image Preview
+        self.image_preview = tk.Label(self.master, text="Image Preview", bg='#121212', fg='white')
+        self.image_preview.pack()
 
-        # # Result Display
-        # self.result_label = tk.Label(self.master, text="")
-        # self.result_label.pack()
 
         # Result Display
-        helv12 = tkFont.Font(family='Helvetica', size=14, weight='bold')
-        self.result_text = scrolledtext.ScrolledText(self.master, bg="#121212", fg="#fff", wrap=tk.WORD, font=(helv12, 10), width  = 20, height = 10)
-        self.result_text.pack(expand=True, fill="both")
-
-        # Loader Canvas
-        self.loader_canvas = tk.Canvas(self.master, width=30, height=30, bg="#121212")
-        self.loader_canvas.pack()
-        self.loader_animation_id = None
+        self.helv12 = tkFont.Font(family='Helvetica', size=14, weight='bold')
+        self.result_frame = tk.Frame(self.master, bg='#121212')
+        self.result_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)  # Center the frame
+        self.result_frame.pack()
 
         # Initialize AWS clients
         self.s3_client = None
@@ -79,28 +85,6 @@ class AWSApp:
             tk.messagebox.showerror("Error", f"Failed to initialize AWS clients. {str(e)}")
 
 
-    # def upload_image(self):
-    #     if self.s3_client is None or self.rekognition_client is None or self.dynamodb_client is None:
-    #         tk.messagebox.showerror("Error", "AWS clients not initialized. Please load AWS info first.")
-    #         return
-
-    #     # Continue with image upload logic
-
-    #     file_path = filedialog.askopenfilename()
-    #     if file_path:
-    #         image = Image.open(file_path)
-    #         image.show()
-
-    #         # Get Labels for Image
-    #     labels = self.get_image_labels(file_path)
-
-    #     # Search Similar Images
-    #     similar_images = self.search_similar_images(labels)
-    #     self.display_results(similar_images)
-        
-    #     if self.s3_client is None or self.rekognition_client is None or self.dynamodb_client is None:
-    #         tk.messagebox.showerror("Error", "AWS clients not initialized. Please load AWS info first.")
-    #         return
     def upload_image(self):
         if self.s3_client is None or self.rekognition_client is None or self.dynamodb_client is None:
             tk.messagebox.showerror("Error", "AWS clients not initialized. Please load AWS info first.")
@@ -108,21 +92,24 @@ class AWSApp:
 
         file_path = filedialog.askopenfilename()
         if file_path:
-            self.start_loader()
-            try:
-                image = Image.open(file_path)
-                image.show()
+            self.uploaded_image_path = file_path
 
-                # Get Labels for Image
-                labels = self.get_image_labels(file_path)
+            # Display the uploaded image preview
+            image = Image.open(file_path)
+            image.thumbnail((300, 300))  # Adjust the size as needed
+            photo = ImageTk.PhotoImage(image)
 
-                # Search Similar Images
-                similar_images = self.search_similar_images(labels)
+            self.image_preview.configure(image=photo)
+            self.image_preview.image = photo
 
-                # Display the results on the UI
-                self.display_results(similar_images)
-            finally:
-                self.stop_loader()
+            # Get Labels for Image
+            labels = self.get_image_labels(file_path)
+
+            # Search Similar Images
+            similar_images = self.search_similar_images(labels)
+
+            # Display the results on the UI
+            self.display_results(similar_images)
         
 
     def get_image_labels(self, file_path):
@@ -140,30 +127,6 @@ class AWSApp:
         return labels
 
     
-    # def search_similar_images(self, target_labels):
-    #     # Query DynamoDB for similar images based on labels
-    #     response = self.dynamodb_client.scan(
-    #         TableName="image_table"  # Replace with your actual DynamoDB table name
-    #     )
-
-    #     similar_images = []
-    #     for item in response['Items']:
-    #         stored_labels = item.get('labels', {}).get('SS', [])
-
-    #         # Check if there is an intersection of labels
-    #         common_labels = set(target_labels) & set(stored_labels)
-    #         similarity_score = len(common_labels)
-
-    #         similar_images.append({
-    #             'image_id': item.get('POID', {}).get('S', ''),
-    #             'stored_labels': stored_labels,
-    #             'similarity_score': similarity_score
-    #         })
-    #     print(similar_images)
-
-    #     # Sort images by similarity score (descending)
-    #     similar_images.sort(key=lambda x: x['similarity_score'], reverse=True)
-    #     return similar_images[:10]  # Return only the top 10 most similar images
     def search_similar_images(self, target_labels):
         # Query DynamoDB for similar images based on labels
         response = self.dynamodb_client.scan(
@@ -197,47 +160,65 @@ class AWSApp:
         return similar_images[:10]
     
 
+        # self.result_text.config(state=tk.DISABLED)  # Disable text widget for editing
     def display_results(self, similar_images):
-        self.result_text.config(state=tk.NORMAL)  # Enable text widget for editing
-        self.result_text.delete(1.0, tk.END)  # Clear previous content
+        for widget in self.result_frame.winfo_children():
+            widget.destroy()
 
         if similar_images:
-            for image in similar_images:
-                result_text = f"Image ID: {image['image_id']}\nLabels: {', '.join(image['stored_labels'])}\n\n"
-                self.result_text.insert(tk.END, result_text)
+            # Display headers
+            header_labels = ["POID", "SIMILARITY", "IMAGE DETAILS"]
+            for col, header in enumerate(header_labels):
+                tk.Label(self.result_frame, text=header, font=self.helv12).grid(row=0, column=col, sticky="nsew", padx=10, pady=4)
+
+            # Display data
+            for row, image in enumerate(similar_images, start=1):
+                image_id = image['image_id']
+                f1_score = image['f1_score']
+                stored_labels = ', '.join(image['stored_labels'])
+                # Create a button for each image
+                btn = tk.Button(self.result_frame, text=image_id, command=lambda i=image_id: self.download_image(i), bg='#333', fg='white', padx=10, pady=2)
+                btn.grid(row=row, column=0, sticky="nsew", padx=10, pady=2)
+
+                tk.Label(self.result_frame, text=f"{f1_score:.4f}", bg='#121212', fg='white').grid(row=row, column=1, sticky="nsew", padx=10, pady=2)
+                tk.Label(self.result_frame, text=stored_labels, bg='#121212', fg='white').grid(row=row, column=2, sticky="nsew", padx=10, pady=2)
+
+                # Add space between rows
+                self.result_frame.grid_rowconfigure(row, minsize=20)
+
         else:
-            self.result_text.insert(tk.END, "No similar images found.")
+            # tk.Label(self.result_frame, text="No similar images found.", font=("Arial", 10, "italic")).grid(row=0, column=0, columnspan=3, sticky="nsew")
+            tk.Label(self.result_frame, text="No similar images found.", font=("Arial", 10, "italic"), bg='#121212', fg='white').grid(row=0, column=0, columnspan=3, sticky="nsew")
 
-        self.result_text.config(state=tk.DISABLED)  # Disable text widget for editing
-
-    
-
-    def start_loader(self):
-        self.loader_thread = threading.Thread(target=self.animate_loader)
-        self.loader_thread.start()
+        # Configure grid weights to make it expandable
+        for i in range(self.result_frame.grid_size()[1]):
+            self.result_frame.grid_columnconfigure(i, weight=1)
 
 
-    def animate_loader(self):
-        self.angle = 0
-        # while self.loader_thread.is_alive():
-        self.loader_canvas.delete("all")
-        x = 15 + 15 * (1 + 0.5 * self.angle)
-        y = 15 + 15 * (1 + 0.5 * self.angle)
-        self.loader_canvas.create_oval(x - 5, y - 5, x + 5, y + 5, fill="white")
-        # time.sleep(0.05)
-        self.angle += 1
-        self.loader_animation_id = self.master.after(50, self.animate_loader)  # 50 milliseconds between frames
+    def download_image(self, image_id):
+        if self.s3_client is None:
+            tk.messagebox.showerror("Error", "AWS S3 client not initialized.")
+            return
 
+        try:
+            # Replace 'your-bucket-name' with your actual S3 bucket name
+            bucket_name = 'dns-assets'
+            folder_path = 'images'  # Update this to the folder path where your images are stored
+            object_key = f"{folder_path}/{image_id}.jpg" # Assuming images are stored with '.jpg' extension
 
-    def stop_loader(self):
-        if self.loader_animation_id:
-            self.master.after_cancel(self.loader_animation_id)
-            self.loader_animation_id = None
-            self.loader_canvas.delete("all")
-        # if self.loader_thread and self.loader_thread.is_alive():
-        #     self.loader_thread.join()
-        #     self.loader_thread = None
-        #     self.loader_canvas.delete("all")
+            # Specify the local directory where you want to save the downloaded image
+            local_directory = tempfile.gettempdir()
+
+            local_path = os.path.join(local_directory, f"{image_id}.jpg")
+
+            # Download the image from S3
+            self.s3_client.download_file(bucket_name, object_key, local_path)
+
+            # Open the downloaded image using the default viewer
+            os.startfile(local_path)
+
+        except Exception as e:
+            tk.messagebox.showerror("Error", f"Failed to download image. {str(e)}")
 
 
 if __name__ == "__main__":
