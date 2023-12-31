@@ -16,6 +16,8 @@ AWS Bucket:
 - AWS Lambda
 - Python
 - Tkinter
+- PIL
+- CTkinter
 
 ## How to run
 1. Clone the repository `git clone https://github.com/Ojas1804/asset-libary.git`
@@ -25,5 +27,5 @@ AWS Bucket:
 5. Select 'Choose Image' and upload the image you want to search for
 
 ## Changes (v2.0.0):
-- Added image preview option for the user
-- Removed download option for images
+- Added download image facility
+- Improved UI with CTkinter
