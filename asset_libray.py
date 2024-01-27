@@ -19,9 +19,9 @@ from scipy import spatial
 import numpy as np
 from botocore.exceptions import NoCredentialsError
 
-uri = "neo4j+s://98ca9fcf.databases.neo4j.io"
-username = "neo4j"
-password = "asc8XSGY_M4sV7x-uEIEkuTpQnnqIy8-QnjRD8D93Ck"
+uri = ""
+username = ""
+password = ""
 
 class Neo4jDatabase:
     def __init__(self):
