@@ -19,6 +19,7 @@ from scipy import spatial
 import numpy as np
 from botocore.exceptions import NoCredentialsError
 
+# enter your Neo4j credentials here
 uri = ""
 username = ""
 password = ""
