@@ -14,7 +14,7 @@ AWS Bucket:
 
 ## Technologies used:
 - AWS S3
-- Neo4j database
+- Neo4j (AuraDB)
 - Python
 - Tkinter
 - PIL
