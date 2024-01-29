@@ -3,6 +3,9 @@
 ## Description
 This project allows you to search similar images stored in AWS S3 buckets and upload images to S3 as well. It uses Resnet50 to vectorize images and stores the vector in a Neo4j AuraDB database. For searching, the search image is vectorized using ResNet50, and cosine similarity is used to find most similar images.
 
+## Working
+![Flowchart](https://github.com/Ojas1804/asset-libary/blob/main/asset-library.jpg)
+
 ## Architecture
 AWS Bucket:
 - bucket
