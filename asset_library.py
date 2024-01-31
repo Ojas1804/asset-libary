@@ -19,7 +19,6 @@ from scipy import spatial
 import numpy as np
 from botocore.exceptions import NoCredentialsError
 
-# enter your Neo4j credentials here
 uri = ""
 username = ""
 password = ""
@@ -53,7 +52,7 @@ class AWSApp:
         self.master.geometry(f"{screen_width}x{screen_height}")
 
         style = ttk.Style()
-        style.configure("TNotebook.Tab", padding=(10, 8), font=('Arial', 14))
+        style.configure("TNotebook.Tab", padding=(10, 8), font=('Arial', 14), background='#121212')
 
         self.notebook = ttk.Notebook(self.master)
         self.notebook.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -100,6 +99,8 @@ class UploadFrame:
 
         self.image_path_label = tk.Label(self.frame, text="Image Path:", bg='#121212', fg='white')
         self.image_path_label.pack(pady=(100, 0))
+        self.uploaded_image_paths = None
+        self.uploaded_fbx_paths = None
 
         # Image Upload
         ctk.CTkButton(self.frame, text="Upload Image", command=self.browse_image,
@@ -111,6 +112,9 @@ class UploadFrame:
 
         self.image_type_entry = tk.Entry(self.frame, bg='#484848', fg='white')
         self.image_type_entry.pack(pady=10)
+
+        self.progress_label = tk.Label(self.frame, text="Progress: ", bg='#121212', fg='white')
+        self.progress_label.pack(pady=10)
 
         # Image Upload
         ctk.CTkButton(self.frame, text="Upload FBX", command=self.browse_fbx,
@@ -135,7 +139,8 @@ class UploadFrame:
         aws_info['AccessKey'] = creds.iloc[0, 0]
         aws_info['SecretKey'] = creds.iloc[0, 1]
         aws_info['Region']='ap-south-1'
-        print(aws_info)
+        # print(aws_info)
+        print('Info uploaded')
 
         return aws_info
 
@@ -151,47 +156,70 @@ class UploadFrame:
 
 
     def browse_image(self):
-        file_path = filedialog.askopenfilename()
-        self.image_path_label.config(text="Image Path: " + file_path)
-        self.uploaded_image_path = file_path
+        # file_path = filedialog.askopenfilename()
+        # self.image_path_label.config(text="Image Path: " + file_path)
+        # self.uploaded_image_path = file_path
+        file_paths = filedialog.askopenfilenames()
+        self.image_path_label.config(text=f"Number of images selected: {len(file_paths)}")
+        self.uploaded_image_paths = file_paths
 
 
     def browse_fbx(self):
-        file_path = filedialog.askopenfilename()
-        self.image_path_label.config(text="FBX Path: " + file_path)
-        self.uploaded_fbx_path = file_path
+        file_paths = filedialog.askopenfilenames()
+        self.image_path_label.config(text=f"Number of images selected: {len(file_paths)}")
+        self.uploaded_fbx_paths = file_paths
+        # file_paths = filedialog.askopenfilenames()
+        # self.image_path_label.config(text=f"Number of files selected: {len(file_paths)}")
+        # self.uploaded_image_paths = file_paths
 
 
     def submit_image(self):
-        if not self.uploaded_image_path:
-            messagebox.showerror("Error", "Please choose an image first.")
-            return
+        # image_type = self.image_type_entry.get()
+        # if self.uploaded_image_paths is None or self.uploaded_fbx_paths is None or self.uploaded_image_paths == '' or self.uploaded_fbx_paths == '':
+        #     messagebox.showerror("Error", "Please choose files to upload first.")
+        #     return
+        
 
-        image_type = self.image_type_entry.get()
-        if not image_type:
-            messagebox.showerror("Error", "Please enter an image type.")
-            return
 
-        try:
-            # Upload image to S3
-            image_name = os.path.basename(self.uploaded_image_path)
-            s3_key_image = f'images/{image_name}'
-            self.s3_client.upload_file(self.uploaded_image_path, 'dns-assets', s3_key_image)
+        if self.uploaded_image_paths is not None and self.uploaded_image_paths != '':
+            # messagebox.showerror("Error", "Please choose an image first.")
+            # return
+            image_type = self.image_type_entry.get()
+            
+            if not image_type:
+                messagebox.showerror("Error", "Please enter an image type.")
+                return
 
-            # Vectorize the image using InceptionV3 model
-            image_vector = self.vectorize_image(self.uploaded_image_path)
+            try:
+                # Upload image to S3
+                i = 0
+                for uploaded_image_path in self.uploaded_image_paths:
+                    self.progress_label.config(text=f"Progress: {i} of {len(self.uploaded_image_paths)} files uploaded")
+                    image_name = os.path.basename(uploaded_image_path)
+                    s3_key_image = f'images/{image_name}'
+                    self.s3_client.upload_file(uploaded_image_path, 'dns-assets', s3_key_image)
+                    # Vectorize the image using InceptionV3 model
+                    image_vector = self.vectorize_image(uploaded_image_path)
+                    # Upload image information to Neo4j
+                    self.upload_to_neo4j(image_name, image_vector, image_type)
+                    i+=1
+                self.progress_label.config(text=f"Progress: {i} of {len(self.uploaded_image_paths)} files uploaded")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+        self.uploaded_image_paths = None
 
-            # Upload image information to Neo4j
-            self.upload_to_neo4j(image_name, image_vector, image_type)
+        if self.uploaded_fbx_paths is not None and self.uploaded_fbx_paths != '':
+            try:
+                i = 0
+                for uploaded_fbx_path in self.uploaded_fbx_paths:
+                    self.progress_label.config(text=f"Progress: {i} of {len(self.uploaded_fbx_paths)} files uploaded")
+                    s3_key_fbx = f'fbx/{os.path.basename(uploaded_fbx_path)}'
+                    self.s3_client.upload_file(uploaded_fbx_path, 'dns-assets', s3_key_fbx)
+                self.progress_label.config(text=f"Progress: {i} of {len(self.uploaded_fbx_paths)} files uploaded")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
 
-            if self.uploaded_fbx_path:
-                s3_key_fbx = f'fbx/{os.path.basename(self.uploaded_fbx_path)}'
-                self.s3_client.upload_file(self.uploaded_fbx_path, 'dns-assets', s3_key_fbx)
-
-            messagebox.showinfo("Success", "Files uploaded successfully!")
-
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+        messagebox.showinfo("Success", "Files uploaded successfully!")
 
 
     def vectorize_image(self, image_path):
@@ -283,7 +311,8 @@ class SearchFrame:
         aws_info['AccessKey'] = creds.iloc[0, 0]
         aws_info['SecretKey'] = creds.iloc[0, 1]
         aws_info['Region']='ap-south-1'
-        print(aws_info)
+        # print(aws_info)
+        print('Info. uploaded and initialized')
 
         return aws_info
 
