@@ -357,9 +357,9 @@ class SearchFrame:
     
     def search_similar_images(self, embeddings, image_type):
         
-        uri = "neo4j+s://98ca9fcf.databases.neo4j.io"
-        username = "neo4j"
-        password = "asc8XSGY_M4sV7x-uEIEkuTpQnnqIy8-QnjRD8D93Ck"
+        uri = ""
+        username = ""
+        password = ""
 
         driver_con = GraphDatabase.driver(uri, auth=(username, password))
         query = (
