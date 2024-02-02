@@ -29,6 +29,7 @@ AWS Bucket:
 6. Select 'Choose CSV File' and upload the CSV file containing the AWS access key.
 7. You have two options (upload image or search image).
 8. Select 'Choose Image' and upload the image you want to search for.
+**Before using the app, you must setup AWS credentials on AWS CLI. Install AWS CLI on your system and then in youe command prompt type `aws configure` and input the details.
 
 ## Changes (v3.0.1):
 - Allow users to upload multiple images of same type at once or multiple fbx files at once.
